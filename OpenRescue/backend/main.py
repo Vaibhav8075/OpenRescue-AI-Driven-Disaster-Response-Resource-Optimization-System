@@ -1,10 +1,25 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from pydantic import BaseModel
 from typing import List
 import pickle
 from pathlib import Path
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# -----------------------------
+# CORS
+# -----------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+allow_origins=["*"],
+
+
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # -----------------------------
 # Load ML Model & Vectorizer
@@ -25,6 +40,7 @@ with open(VECTORIZER_PATH, "rb") as f:
 # -----------------------------
 
 incidents = []
+active_connections: List[WebSocket] = []
 
 class Incident(BaseModel):
     description: str
@@ -32,7 +48,21 @@ class Incident(BaseModel):
     longitude: float
 
 # -----------------------------
-# Routes
+# WebSocket Endpoint
+# -----------------------------
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    active_connections.append(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except:
+        active_connections.remove(websocket)
+
+# -----------------------------
+# REST Routes
 # -----------------------------
 
 @app.get("/")
@@ -40,7 +70,7 @@ def home():
     return {"message": "OpenRescue Backend Running"}
 
 @app.post("/report")
-def report_incident(incident: Incident):
+async def report_incident(incident: Incident):
     vectorized_text = vectorizer.transform([incident.description])
     severity = model.predict(vectorized_text)[0]
 
@@ -53,9 +83,13 @@ def report_incident(incident: Incident):
     }
 
     incidents.append(incident_data)
+
+    # Broadcast to all connected WebSocket clients
+    for connection in active_connections:
+        await connection.send_json(incident_data)
+
     return incident_data
 
 @app.get("/incidents")
 def get_incidents():
     return incidents
-    
