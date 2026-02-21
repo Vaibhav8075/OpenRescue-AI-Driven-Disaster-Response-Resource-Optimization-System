@@ -4,6 +4,29 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { useEffect, useState } from "react";
 import L from "leaflet";
 
+const backendBaseUrl =
+  process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://127.0.0.1:8000";
+
+function getWebSocketUrl(httpUrl: string) {
+  const url = new URL(httpUrl);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = "/ws";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+type Incident = {
+  id: number;
+  description: string;
+  lat: number;
+  lon: number;
+  severity: string;
+  assigned_team?: {
+    name: string;
+  };
+};
+
 function getMarkerIcon(severity: string) {
   let color = "green";
 
@@ -24,30 +47,56 @@ function getMarkerIcon(severity: string) {
 }
 
 export default function MapComponent() {
-  const [incidents, setIncidents] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
 
   useEffect(() => {
-    // Initial fetch
-    fetch("http://127.0.0.1:8000/incidents")
-      .then((res) => res.json())
-      .then((data) => setIncidents(data))
-      .catch((err) => console.error("Fetch error:", err));
+    const controller = new AbortController();
+    let unmounting = false;
 
-    // WebSocket connection
-    const socket = new WebSocket("ws://localhost:8000/ws");
+    const loadIncidents = async () => {
+      try {
+        const response = await fetch(`${backendBaseUrl}/incidents`, {
+          signal: controller.signal,
+        });
 
+        if (!response.ok) {
+          throw new Error(`Unexpected status: ${response.status}`);
+        }
+
+        const data: Incident[] = await response.json();
+        setIncidents(data);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Failed to fetch incidents from backend:", error);
+      }
+    };
+
+    loadIncidents();
+
+    const socket = new WebSocket(getWebSocketUrl(backendBaseUrl));
 
     socket.onmessage = (event) => {
-      const newIncident = JSON.parse(event.data);
+      const newIncident: Incident = JSON.parse(event.data);
       setIncidents((prev) => [...prev, newIncident]);
     };
 
-    socket.onerror = (error) => {
-      console.error("WebSocket error:", error);
+    socket.onerror = () => {
+      if (!unmounting) {
+        console.error("WebSocket connection error. Check backend /ws.");
+      }
     };
 
     return () => {
-      socket.close();
+      unmounting = true;
+      controller.abort();
+      if (
+        socket.readyState === WebSocket.OPEN ||
+        socket.readyState === WebSocket.CONNECTING
+      ) {
+        socket.close(1000, "MapComponent unmounted");
+      }
     };
   }, []);
 
