@@ -7,10 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# -----------------------------
-# CORS
-# -----------------------------
-
 app.add_middleware(
     CORSMiddleware,
 allow_origins=["*"],
@@ -20,10 +16,6 @@ allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# -----------------------------
-# Load ML Model & Vectorizer
-# -----------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / "ml" / "severity_model.pkl"
@@ -35,10 +27,6 @@ with open(MODEL_PATH, "rb") as f:
 with open(VECTORIZER_PATH, "rb") as f:
     vectorizer = pickle.load(f)
 
-# -----------------------------
-# Temporary In-Memory Storage
-# -----------------------------
-
 incidents = []
 active_connections: List[WebSocket] = []
 
@@ -46,10 +34,6 @@ class Incident(BaseModel):
     description: str
     latitude: float
     longitude: float
-
-# -----------------------------
-# WebSocket Endpoint
-# -----------------------------
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -60,10 +44,6 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except:
         active_connections.remove(websocket)
-
-# -----------------------------
-# REST Routes
-# -----------------------------
 
 @app.get("/")
 def home():
@@ -84,7 +64,6 @@ async def report_incident(incident: Incident):
 
     incidents.append(incident_data)
 
-    # Broadcast to all connected WebSocket clients
     for connection in active_connections:
         await connection.send_json(incident_data)
 

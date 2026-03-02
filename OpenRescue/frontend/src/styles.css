@@ -1,0 +1,159 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #112;
+  background: #f4f6fb;
+}
+
+.dashboard {
+  min-height: 100vh;
+}
+
+.topbar {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 16px 24px;
+  border-bottom: 3px solid #1d4ed8;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 16px;
+  padding: 16px;
+}
+
+.panel {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #dbe2ea;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+textarea,
+input {
+  width: 100%;
+  border: 1px solid #c7d2e1;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+}
+
+textarea:focus,
+input:focus {
+  outline: 2px solid #93c5fd;
+  border-color: #60a5fa;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 14px;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.status {
+  margin: 0;
+  font-size: 13px;
+  color: #1e3a8a;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stats article {
+  border: 1px solid #d7e3f3;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fbff;
+}
+
+.stats p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #526173;
+}
+
+.stats strong {
+  font-size: 24px;
+}
+
+.tableWrap {
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #edf2f8;
+  font-size: 13px;
+}
+
+th {
+  background: #f8fafc;
+}
+
+.mapPanel {
+  padding: 10px;
+}
+
+.map {
+  width: 100%;
+  height: calc(100vh - 110px);
+  border-radius: 10px;
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .map {
+    height: 60vh;
+  }
+}
