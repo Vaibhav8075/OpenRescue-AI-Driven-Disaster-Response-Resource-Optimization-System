@@ -2,7 +2,6 @@ import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
-# Small training dataset (you can expand later)
 texts = [
     "Minor water logging in street",
     "Small fire in garbage area",
