@@ -1,6 +1,15 @@
 import { normalizeSeverity } from "../utils/severity";
 
-export default function IncidentTable({ incidents }) {
+export default function IncidentTable({ incidents, isLoading }) {
+  if (isLoading) {
+    return (
+      <div className="tableWrap">
+        <h2>Recent Incidents</h2>
+        <p className="tableState">Loading incidents...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="tableWrap">
       <h2>Recent Incidents</h2>
@@ -22,7 +31,7 @@ export default function IncidentTable({ incidents }) {
           ))}
           {incidents.length === 0 ? (
             <tr>
-              <td colSpan={3}>No incidents yet.</td>
+              <td colSpan={3}>No incidents match the current filters.</td>
             </tr>
           ) : null}
         </tbody>

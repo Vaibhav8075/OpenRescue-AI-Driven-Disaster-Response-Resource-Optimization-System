@@ -31,7 +31,7 @@ export default function IncidentMap({ incidents, onMapPick }) {
         attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <MapClickPicker onPick={onMapPick} />
+      {onMapPick ? <MapClickPicker onPick={onMapPick} /> : null}
       {incidents.map((incident) => (
         <Marker
           key={incident.id}

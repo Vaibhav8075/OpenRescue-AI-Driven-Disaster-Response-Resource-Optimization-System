@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
+import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { BACKEND_BASE_URL } from "./config";
-import ReportForm from "./components/ReportForm";
-import StatsCards from "./components/StatsCards";
-import IncidentTable from "./components/IncidentTable";
-import IncidentMap from "./components/IncidentMap";
+import DashboardPage from "./pages/DashboardPage";
+import ReportPage from "./pages/ReportPage";
+import DemoModeToggle from "./components/DemoModeToggle";
 import { normalizeSeverity, severityScore } from "./utils/severity";
 import { getWebSocketUrl } from "./utils/network";
+import { mockIncidents } from "./mock/incidents";
 
 export default function App() {
   const [incidents, setIncidents] = useState([]);
   const [description, setDescription] = useState("");
   const [latitude, setLatitude] = useState("12.9716");
   const [longitude, setLongitude] = useState("77.5946");
-  const [status, setStatus] = useState("");
+  const [formStatus, setFormStatus] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [socketError, setSocketError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [severityFilter, setSeverityFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("latest");
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -21,6 +29,8 @@ export default function App() {
 
     async function loadIncidents() {
       try {
+        setIsLoading(true);
+        setLoadError("");
         const response = await fetch(`${BACKEND_BASE_URL}/incidents`, {
           signal: controller.signal,
         });
@@ -31,7 +41,11 @@ export default function App() {
         setIncidents(Array.isArray(data) ? data : []);
       } catch (error) {
         if (!controller.signal.aborted) {
-          setStatus(error.message);
+          setLoadError(error.message);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
         }
       }
     }
@@ -39,6 +53,7 @@ export default function App() {
     loadIncidents();
 
     socket.onmessage = (event) => {
+      setSocketError("");
       const incoming = JSON.parse(event.data);
       setIncidents((current) => {
         const exists = current.some((item) => item.id === incoming.id);
@@ -47,7 +62,7 @@ export default function App() {
     };
 
     socket.onerror = () => {
-      setStatus("WebSocket disconnected. Check backend server.");
+      setSocketError("WebSocket disconnected. Live updates are unavailable.");
     };
 
     return () => {
@@ -58,31 +73,60 @@ export default function App() {
     };
   }, []);
 
+  const dataSource = useMemo(() => (demoMode ? mockIncidents : incidents), [demoMode, incidents]);
+
+  const filteredIncidents = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+
+    const list = dataSource.filter((incident) => {
+      const severity = normalizeSeverity(incident.severity);
+      const severityMatched = severityFilter === "All" || severity === severityFilter;
+      const descriptionMatched =
+        search.length === 0 || String(incident.description ?? "").toLowerCase().includes(search);
+      return severityMatched && descriptionMatched;
+    });
+
+    const sorted = [...list].sort((a, b) => {
+      if (sortBy === "oldest") {
+        return a.id - b.id;
+      }
+      if (sortBy === "severity_desc") {
+        return severityScore(b.severity) - severityScore(a.severity) || b.id - a.id;
+      }
+      if (sortBy === "severity_asc") {
+        return severityScore(a.severity) - severityScore(b.severity) || b.id - a.id;
+      }
+      return b.id - a.id;
+    });
+
+    return sorted;
+  }, [dataSource, searchTerm, severityFilter, sortBy]);
+
   const stats = useMemo(() => {
-    const total = incidents.length;
-    const high = incidents.filter((incident) => severityScore(incident.severity) >= 3).length;
+    const total = filteredIncidents.length;
+    const high = filteredIncidents.filter((incident) => severityScore(incident.severity) >= 3).length;
     return { total, high };
-  }, [incidents]);
+  }, [filteredIncidents]);
 
   const recentIncidents = useMemo(() => {
-    return [...incidents].sort((a, b) => b.id - a.id).slice(0, 10);
-  }, [incidents]);
+    return filteredIncidents.slice(0, 10);
+  }, [filteredIncidents]);
 
   async function onSubmit(event) {
     event.preventDefault();
     const lat = Number(latitude);
     const lon = Number(longitude);
     if (!description.trim()) {
-      setStatus("Description is required.");
+      setFormStatus("Description is required.");
       return;
     }
     if (Number.isNaN(lat) || Number.isNaN(lon)) {
-      setStatus("Valid latitude and longitude are required.");
+      setFormStatus("Valid latitude and longitude are required.");
       return;
     }
 
     setSubmitting(true);
-    setStatus("");
+    setFormStatus("");
     try {
       const response = await fetch(`${BACKEND_BASE_URL}/report`, {
         method: "POST",
@@ -102,9 +146,9 @@ export default function App() {
         return exists ? current : [...current, created];
       });
       setDescription("");
-      setStatus(`Incident #${created.id} submitted with ${normalizeSeverity(created.severity)} severity.`);
+      setFormStatus(`Incident #${created.id} submitted with ${normalizeSeverity(created.severity)} severity.`);
     } catch (error) {
-      setStatus(error.message);
+      setFormStatus(error.message);
     } finally {
       setSubmitting(false);
     }
@@ -119,29 +163,64 @@ export default function App() {
     <div className="dashboard">
       <header className="topbar">
         <h1>OpenRescue Control Room</h1>
+        <nav className="topnav">
+          <NavLink
+            to="/dashboard"
+            className={({ isActive }) => (isActive ? "navlink active" : "navlink")}
+          >
+            Dashboard
+          </NavLink>
+          <NavLink
+            to="/report"
+            className={({ isActive }) => (isActive ? "navlink active" : "navlink")}
+          >
+            Report
+          </NavLink>
+          <DemoModeToggle enabled={demoMode} onToggle={() => setDemoMode((current) => !current)} />
+        </nav>
       </header>
 
-      <main className="layout">
-        <section className="panel stack">
-          <ReportForm
-            description={description}
-            latitude={latitude}
-            longitude={longitude}
-            submitting={submitting}
-            status={status}
-            onDescriptionChange={setDescription}
-            onLatitudeChange={setLatitude}
-            onLongitudeChange={setLongitude}
-            onSubmit={onSubmit}
-          />
-          <StatsCards total={stats.total} high={stats.high} />
-          <IncidentTable incidents={recentIncidents} />
-        </section>
-
-        <section className="panel mapPanel">
-          <IncidentMap incidents={incidents} onMapPick={onMapPick} />
-        </section>
-      </main>
+      <Routes>
+        <Route
+          path="/report"
+          element={
+            <ReportPage
+              description={description}
+              latitude={latitude}
+              longitude={longitude}
+              submitting={submitting}
+              formStatus={formStatus}
+              onDescriptionChange={setDescription}
+              onLatitudeChange={setLatitude}
+              onLongitudeChange={setLongitude}
+              onSubmit={onSubmit}
+              incidents={dataSource}
+              onMapPick={onMapPick}
+            />
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <DashboardPage
+              searchTerm={searchTerm}
+              severityFilter={severityFilter}
+              sortBy={sortBy}
+              onSearchChange={setSearchTerm}
+              onSeverityChange={setSeverityFilter}
+              onSortChange={setSortBy}
+              loadError={loadError}
+              socketError={socketError}
+              stats={stats}
+              recentIncidents={recentIncidents}
+              isLoading={isLoading}
+              filteredIncidents={filteredIncidents}
+            />
+          }
+        />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
     </div>
   );
 }
